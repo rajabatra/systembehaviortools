@@ -4,20 +4,20 @@
 
 load("RVCradle.mat"); 
 
-fs = 5000;    % sampling frequency of data in RVCradle
-order = 3000; % order for non-Fourier PSD estimation
+fs = 5000;     % sampling frequency of data in RVCradle
+order = 3000;  % order for non-Fourier PSD estimation
 N = 800000;    % section of data to analyze for non-Fourier PSD estimation
 
 blocktime = 10;               % block time in seconds (to average FRF)
 windowlen = blocktime * fs;   % convert block time from seconds to sample num
-overlap = 0.5 * windowlen;    % block overlap for use in calculating FRFs
+overlap = 0 * windowlen;      % block overlap for use in calculating FRFs
 w = hann(windowlen);          % hanning window of specified windowlen for use calculating FRFs
 
-L2= L2Flow2S(1:N,2);       % truncate data to allow faster PSD estimation
-L1 = L1Flow2S(1:N,2);
-C = CFlow2S(1:N,2);
-R1 = R1Flow2S(1:N,2);
-R2 = R2Flow2S(1:N,2);
+% L2 = L2Flow2S(1:N,2);       % truncate data to allow faster PSD estimation
+% L1 = L1Flow2S(1:N,2);
+% C = CFlow2S(1:N,2);
+% R1 = R1Flow2S(1:N,2);
+% R2 = R2Flow2S(1:N,2);
 
 % [psdL2, fL2] = pburg(L2, order, N, fs);   % perform PSD estimation
 % "completed L2"
@@ -41,43 +41,69 @@ R2 = R2Flow2S(1:N,2);
 % xlim([0 15]);
 
 
-[H_l2l2, f_l2l2] = tfestimate(L2Flow2S(:,2), L2Flow2S(:,2), w, overlap, windowlen, fs); % calculate FRFs
-[H_l2c, f_l2c]   = tfestimate(L2Flow2S(:,2), CFlow2S(:,2), w, overlap, windowlen, fs);
-[H_l2r1, f_l2r1] = tfestimate(L2Flow2S(:,2), R1Flow2S(:,2), w, overlap, windowlen, fs);
-[H_l2r2, f_l2r2] = tfestimate(L2Flow2S(:,2), R2Flow2S(:,2), w, overlap, windowlen, fs);
-[H_l2l1, f_l2l1] = tfestimate(L2Flow2S(:,2), L1Flow2S(:,2), w, overlap, windowlen, fs);
+[H_l2, f_l2] = tfestimate(L1Flow2S, L2Flow2S, w, [], windowlen, fs); % calculate FRFs
+[H_c, f_c] = tfestimate(L1Flow2S, CFlow2S, w, [], windowlen, fs);
+[H_r1, f_r1] = tfestimate(L1Flow2S, R1Flow2S, w, [], windowlen, fs);
+[H_r2, f_r2] = tfestimate(L1Flow2S, R2Flow2S, w, [], windowlen, fs);
 
-i = 36;
+figure(1);
+hold on;
+plot(f_l2, abs(H_l2(:,2)));
+plot(f_c, abs(H_c(:,2)));
+plot(f_r1, abs(H_r1(:,2)));
+plot(f_r2, abs(H_r2(:,2)));
+xlim([0 20])
 
-mags = [abs(H_l2l2(i)), abs(H_l2l1(i)), abs(H_l2c(i)), abs(H_l2r1(i)), abs(H_l2r2(i))];
-angles = [angle(H_l2l2(i)), angle(H_l2l1(i)), angle(H_l2c(i)), angle(H_l2r1(i)), angle(H_l2r2(i))];
-xpos = [-226.31, -126.86, 0.00, 127.26, 226.58];
-ypos = [-164.87, -249.61, -280.00, -249.41, -164.51];
+ind   = 37;
+magl2 = abs(H_l2(ind, 2));
+magl1 = 1;
+magc  = abs(H_c(ind, 2));
+magr1 = abs(H_r1(ind, 2));
+magr2 = abs(H_r2(ind, 2));
+
+mags   = [magl2 magl1 magc magr1 magr2];
+
+phasel2 = angle(H_l2(ind, 2));
+phasel1 = 0;
+phasec = angle(H_c(ind, 2));
+phaser1 = angle(H_r1(ind, 2));
+phaser2 = angle(H_r2(ind, 2));
 
 t = 0:0.01:2*pi;
-inputacc = sin(2*pi*3.5*t);
-l2acc = mags(1)*sin(2*pi*3.5*t+angles(1));
-l1acc = mags(2)*sin(2*pi*3.5*t+angles(2));
-cacc = mags(3)*sin(2*pi*3.5*t+angles(3));
-r1acc = mags(4)*sin(2*pi*3.5*t+angles(4));
-r2acc = mags(5)*sin(2*pi*3.5*t+angles(5));
 
-order = 4;
-xvals = xpos(1):xpos(end);
-for k = 1:length(t)
-    accs = [l2acc(k), l1acc(k), cacc(k), r1acc(k), r2acc(k)];
-    coefs = polyfit(xpos, accs, order);
-    f = polyval(coefs, xvals);
-    plot(xvals, f);
+l2 = magl2*sin(2*pi*3.6*t+phasel2);
+l1 = magl1*sin(2*pi*3.6*t+phasel1);
+lc = magc*sin(2*pi*3.6*t+phasec);
+r1 = magr1*sin(2*pi*3.6*t+phaser1);
+r2 = magr2*sin(2*pi*3.6*t+phaser2);
+
+angles = [-144, -117, -90, -63, -36];
+
+xcoords = [-226.31, -126.86, 0.00, 127.26, 226.58];
+ycoords = [-164.87, -249.61, -280.00, -249.41, -164.51];
+
+figure(2);
+for i = 1:length(t)
+    m = [l2(i) l1(i) lc(i) r1(i) r2(i)];
+    dx = m .* cosd(angles);
+    dy = m .* sind(angles);
+    
+    amp = 1; %% amt by which to amplify the new signal
+    
+    newxcoords = xcoords + amp*dx;
+    newycoords = ycoords + amp*dy;
+    
+    xq   = xcoords(1):0.1:xcoords(end);
+    y    = interp1(xcoords, ycoords, xq, 'spline');
+    newy = interp1(newxcoords, newycoords, xq, 'spline');    
+    
     hold on;
-    plot(xvals, zeros(size(xvals)))
-    ylim([-5 5])
-    pause(0.1);
+    plot(xq, y, 'linewidth', 1);
+    plot(xq, newy, 'linewidth', 1);
+    ylim([-300 -160])
+    pause(0.1)
     clf
 end
 
 
-
-
-    
 
