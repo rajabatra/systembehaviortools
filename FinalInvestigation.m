@@ -26,46 +26,70 @@ ylabel("acceleration (g)");
 title("Acceleration at Spillway");
 
 %% Frequency Domain Analysis
-order = 3000;
+order = 650;
 
-starts = [389974, 525030, 689249];
-ends = [462835, 587833, 820458];
+[p_psd, p_f] = pburg(pier_acc, order, length(pier_acc), fs);
+[sw_psd, sw_f] = pburg(spillway_acc, order, length(spillway_acc), fs);
 
-% preallocate cell arrays (b/c vectors will have diff lengths)
-pier = cell(3, 1);
-spillway = cell(3,1);
-p_psd = cell(3,1);
-p_f = cell(3,1);
-s_psd = cell(3,1);
-s_f = cell(3,1);
+% 
+% 
+% % Plot PSDs
+% figure(3);
+% semilogy(p_f, p_psd);
+% xlabel("frequency (Hz)");
+% ylabel("power");
+% title("Pier PSD");
+% xlim([0 30]);
+% 
+% 
+% figure(4);
+% semilogy(sw_f, sw_psd);
+% xlabel("frequency (Hz)");
+% ylabel("power");
+% title("Spillway PSD");
+% xlim([0 30]);
 
-% select "on" segments and compute PSDs
-for i = 1:3
-    pier{i} = pier_acc(starts(i):ends(i));
-    spillway{i} = spillway_acc(starts(i):ends(i));
-    [p_psd{i}, p_f{i}] = pburg(pier{i}, order, length(pier{i}), fs);
-    [s_psd{i}, s_f{i}] = pburg(spillway{i}, order, length(spillway{i}), fs);
+
+wn_p = [5.234, 7.37];
+z_p = 0.0782;
+
+cpmp = 2*z_p*wn_p; %%2 component vectors
+kpmp = wn_p.^2;
+
+wn_sw = [1.93, 3.276, 4.778, 5.957, 7.343];
+z_sw = 0.045;
+
+cswmsw = 2*z_sw*wn_sw; %% 4 component vectors
+kswmsw = wn_sw.^2;
+
+r = 10^2;
+step = 0.01;
+w = step:step:50;
+x = zeros(size(w));
+
+for p = 1:2
+    for sw = 1:4
+    a = -(w.^2) + 1i.*w.*cpmp(p) + kpmp(p);
+    b = -1i.*w*cpmp(p)-kpmp(p);
+    c = b;
+    d = -(w.^2)*r+1i.*2.*cpmp(p) + 1i.*w.*cswmsw(sw)*r + kpmp(p) + kswmsw(sw)*r;
+    f = (1i.*w).^-1;
+    x = x + (a.*f)./(a.*d-b.*c);
+    end
 end
 
-% Plot PSDs
-figure(3);
-for i = 1:3
-    subplot(3,1,i)
-    semilogy(p_f{i}, p_psd{i});
-    xlabel("frequency (Hz)");
-    ylabel("power");
-    title(sprintf("Pier: Spill %d", i));
-    xlim([0 30]);
-end
+model_psd = -(w.^2).*x;
 
-figure(4);
-for i = 1:3
-    subplot(3,1,i)
-    semilogy(s_f{i}, s_psd{i});
-    xlabel("frequency (Hz)");
-    ylabel("power");
-    title(sprintf("Spillway: Spill %d", i));
-    xlim([0 30]);
-end
+figure(3)
+hold on;
+yyaxis left
+semilogy(w, abs(model_psd))
+yyaxis right
+semilogy(sw_f, sw_psd);
+xlim([0 10]);
+xlabel("frequency (hz)");
+title("Real and Predicted PSD");
+legend("Model PSD", "Real PSD");
+
 
 
