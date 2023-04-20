@@ -1,4 +1,4 @@
-%% E101 HW6 MATLAB code
+%% E101 Cradle System
 % Rafael Burger (rburger@hmc.edu) and Raja Batra (rbatra@hmc.edu)
 % 11/29/2022
 
